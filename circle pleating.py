@@ -56,6 +56,10 @@ def pyx(tm): #converts tm coordinates to the python coordinates. for now, it is 
 def pyy(tm):
     return 400-(float(tm)*300)
 def displaycp():
+    global paths, edges, nodes
+    paths = []
+    edges = []
+    nodes = [] #we reset this everytime we import a new .tmd5 file
     canvas2.create_rectangle(50,100,350,400,fill='white',outline="black")
     canvas2.create_rectangle(400,100,700,400,fill='white',outline="black")
     for x in range(1,len(creases)):
@@ -179,11 +183,60 @@ def bumpgrid():
     canvas2.create_text(600,85,text=" Grid size: "+str(mingrid))
     draw_flaps()
     pythas()
+    
 #=======
+    
+class Path():
+    def __init__(self,index, tmlength,node1, node2): #tmlength is in units, and is the minimum length
+        self.index = index
+        self.node1 = node1
+        self.node2 = node2
+        self.tmlength = float(tmlength)
+        self.find_coordinates()
+    def find_coordinates(self):
+        for n in range(0,len(nodes)):
+            if nodes[n].index == self.node1:
+                self.x1 = approx_nodes[n].x
+                self.y1 = approx_nodes[n].y
+            if nodes[n].index == self.node2:
+                self.x2 = approx_nodes[n].x
+                self.y2 = approx_nodes[n].y
+        self.bplength = max(abs(self.x1-self.x2),abs(self.y1-self.y2))
+        self.bphypotenuse = ((self.x1-self.x2)**2 + (self.y1-self.y2)**2)**0.5
+    def is_too_tight(self):#see if the nodes are too close. draw with red
+        if self.bphypotenuse*mingrid < self.tmlength:
+            return True
+        else:
+            return False
+    def needs_pytha(self): #see if it needs a pytha
+        if self.bplength*mingrid < self.tmlength and self.bphypotenuse*mingrid>self.tmlength:
+            return True
+        else:
+            return False
+        
+    def is_too_loose(self): #see if the nodes are supposed to be optimal path, but are too loose. draw with green
+        pass
+
+def find_paths():
+    global paths
+    paths = []
+    for scanner in range(0,len(tmfile)):
+        if tmfile[scanner] == 'path' and tmfile[scanner+6] == "true":
+            paths.append(Path(tmfile[scanner+1],tmfile[scanner+2],tmfile[scanner+15],tmfile[scanner+16]))
+            
 def pythas():
+    find_paths()
     find_pythas()
+
 def find_pythas():
-    pass #i think i had some similar detection thing in the boxpleater. flap lengths and coordinates--you might need the paths in order to deal with rivers though.
+    for x in range(0,len(paths)):
+        paths[x].find_coordinates()
+        if paths[x].is_too_tight():
+            canvas2.create_line(pyx2(paths[x].x1),pyy(paths[x].y1),pyx2(paths[x].x2),pyy(paths[x].y2),fill='red')
+        if paths[x].needs_pytha():
+            canvas2.create_line(pyx2(paths[x].x1),pyy(paths[x].y1),pyx2(paths[x].x2),pyy(paths[x].y2),fill='orange')
+    
+     #i think i had some similar detection thing in the boxpleater. flap lengths and coordinates--you might need the paths in order to deal with rivers though.
         #its annoying bc paths don't list which nodes are associated, but perhaps the nodes list which paths are associated with it?
 
 #then start making a bpcpfile
