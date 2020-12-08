@@ -62,11 +62,11 @@ def displaycp():
     canvas2.create_rectangle(200,50,700,550,fill='white',outline="black", width = 2)
     for x in range(1,len(creases)):
         if creases[x][2]==2:
-            canvas2.create_line(pyx(creases[x][0][0]),pyy(creases[x][0][1]),pyx(creases[x][1][0]),pyy(creases[x][1][1]),fill="red")
+            canvas2.create_line(pyx(creases[x][0][0]),pyy(creases[x][0][1]),pyx(creases[x][1][0]),pyy(creases[x][1][1]),fill="red",width =2)
         if creases[x][2]==3:
-            canvas2.create_line(pyx(creases[x][0][0]),pyy(creases[x][0][1]),pyx(creases[x][1][0]),pyy(creases[x][1][1]),fill="blue")
+            canvas2.create_line(pyx(creases[x][0][0]),pyy(creases[x][0][1]),pyx(creases[x][1][0]),pyy(creases[x][1][1]),fill="blue",width =2)
         if creases[x][2]==1:
-            canvas2.create_line(pyx(creases[x][0][0]),pyy(creases[x][0][1]),pyx(creases[x][1][0]),pyy(creases[x][1][1]),fill="black")
+            canvas2.create_line(pyx(creases[x][0][0]),pyy(creases[x][0][1]),pyx(creases[x][1][0]),pyy(creases[x][1][1]),fill="black",width =2)
         if creases[x][2]==0:
             canvas2.create_line(pyx(creases[x][0][0]),pyy(creases[x][0][1]),pyx(creases[x][1][0]),pyy(creases[x][1][1]),fill="cyan",width = 0.5)
     
@@ -102,21 +102,23 @@ enter.place(x=20,y=450)
 #=============================================================
 
 
-def bpify():
-    global nodes,edges, scale,mingrid
+def bpify():  #make this one do all the initial things that shouldn't be done again
+    global nodes,edges, scale,mingrid, cpfile
     canvas2.delete('all')
+    cpfile = []
     #displaycp()
     canvas2.create_rectangle(200,50,700,550,fill='white',outline="black", width = 2)
     scale = float(tmfile[4])
     mingrid=int(1/scale)+1  #the minimum grid size is the reciprocal of the scale value, rounded up
     #perhaps require that the grid be even if there is book symmetry?
     draw_grid(mingrid)
-    canvas2.create_text(770,120,text=" Grid size: "+str(mingrid))
+    canvas2.create_text(770,121,text=" Grid size: "+str(mingrid))
+    canvas2.create_text(780,105,text=" Relative efficiency: "+str(round(((1/mingrid)/scale)*100)/100))
     draw_flaps()
-    pythas()
+    pythas(True)
     for p in range(0,len(paths)):
         if paths[p].is_too_tight():
-            bumpgrid()
+            initialbumpgrid()
             pass
 #=======
 def pyx2(tm):
@@ -128,10 +130,10 @@ def draw_grid(mingrid):
         canvas2.create_line(pyx2(0),pyy(position), pyx2(1), pyy(position), width = 0.5, fill = "light gray")    #horizontal line
         position = position+1/mingrid
 #========
-def draw_flaps():
+def draw_flaps(): #only used for the first time, the initial extraction and whatnot
     find_nodes()
     find_edges()
-    assign_flap_lengths()
+    assign_flap_lengths() #connect the edges and nodes
     approximate_positions(mingrid)
     draw()
 class Leaf_node():
@@ -141,11 +143,16 @@ class Leaf_node():
         self.y = float(y)
         self.flaplength = float(flaplength)
         self.paths=[]
+        self.has_pytha_ur = self.has_pytha_ul = self.has_pytha_dl = self.has_pytha_dr = False #ul = upper left, dr = down right, etc
     def drawx(self):
-        canvas2.create_line(pyx(self.x),pyy(self.y),pyx(self.x-min(self.x,self.y,float(self.flaplength)/mingrid)),pyy(self.y-min(self.x,self.y,float(self.flaplength)/mingrid)),fill='red')  #down and left
-        canvas2.create_line(pyx(self.x),pyy(self.y),pyx(self.x+min(1-self.x,self.y,float(self.flaplength)/mingrid)),pyy(self.y-min(1-(self.x),self.y,float(self.flaplength)/mingrid)),fill='red')  #down and right
-        canvas2.create_line(pyx(self.x),pyy(self.y),pyx(self.x+min(1-self.x,1-self.y,float(self.flaplength)/mingrid)),pyy(self.y+min(1-(self.x),1-self.y,float(self.flaplength)/mingrid)),fill='red')  #up and right
-        canvas2.create_line(pyx(self.x),pyy(self.y),pyx(self.x-min(self.x,1-self.y,float(self.flaplength)/mingrid)),pyy(self.y+min(self.x,1-self.y,float(self.flaplength)/mingrid)),fill='red')  #up and left
+        if not self.has_pytha_dl:
+            canvas2.create_line(pyx(self.x),pyy(self.y),pyx(self.x-min(self.x,self.y,float(self.flaplength)/mingrid)),pyy(self.y-min(self.x,self.y,float(self.flaplength)/mingrid)),fill='red',width = 2)  #down and left
+        if not self.has_pytha_dr:
+            canvas2.create_line(pyx(self.x),pyy(self.y),pyx(self.x+min(1-self.x,self.y,float(self.flaplength)/mingrid)),pyy(self.y-min(1-(self.x),self.y,float(self.flaplength)/mingrid)),fill='red', width = 2)  #down and right
+        if not self.has_pytha_ur:
+            canvas2.create_line(pyx(self.x),pyy(self.y),pyx(self.x+min(1-self.x,1-self.y,float(self.flaplength)/mingrid)),pyy(self.y+min(1-(self.x),1-self.y,float(self.flaplength)/mingrid)),fill='red', width = 2)  #up and right
+        if not self.has_pytha_ul:
+            canvas2.create_line(pyx(self.x),pyy(self.y),pyx(self.x-min(self.x,1-self.y,float(self.flaplength)/mingrid)),pyy(self.y+min(self.x,1-self.y,float(self.flaplength)/mingrid)),fill='red', width = 2)  #up and left
 
 def drawxs():
     for n in range(0,len(nodes)):
@@ -177,34 +184,133 @@ def approximate_positions(mingrid):
     global approx_nodes
     approx_nodes = nodes[:]
     for n in range(0,len(nodes)): #also could have been done as a method
-        approx_nodes[n].x=round(float(approx_nodes[n].x)*mingrid)/mingrid
-        approx_nodes[n].y=round(float(approx_nodes[n].y)*mingrid)/mingrid
+        approx_nodes[n].x=round(float(nodes[n].x)*mingrid)/mingrid
+        approx_nodes[n].y=round(float(nodes[n].y)*mingrid)/mingrid
 def draw():
     for n in range(0,len(nodes)):
         canvas2.create_oval(pyx2(approx_nodes[n].x)-1,pyy(approx_nodes[n].y)-1,pyx2(approx_nodes[n].x)+1,pyy(approx_nodes[n].y)+1,fill='black')
         canvas2.create_oval(pyx2(float(approx_nodes[n].x)-(1/mingrid)*float(approx_nodes[n].flaplength)),pyy(float(approx_nodes[n].y)-(1/mingrid)*float(approx_nodes[n].flaplength)),pyx2(float(approx_nodes[n].x)+(1/mingrid)*float(approx_nodes[n].flaplength)),pyy(float(approx_nodes[n].y)+(1/mingrid)*float(approx_nodes[n].flaplength)),outline='gray')
 
+def initialbumpgrid(): #nvm this, it's kinda complicated
+    global mingrid, cpfile
+    mingrid = mingrid+1
+    canvas2.delete('all')
+    global cpfile
+    cpfile = []
+    canvas2.create_rectangle(200,50,700,550,fill='white',outline="black", width = 2)
+    draw_grid(mingrid)
+    canvas2.create_text(770,120,text=" Grid size: "+str(mingrid))
+    canvas2.create_text(780,105,text=" Relative efficiency: "+str(round(((1/mingrid)/scale)*100)/100))
+    draw_flaps()
+    pythas(False)
+
 def bumpgrid():
     global mingrid
     mingrid = mingrid+1
     canvas2.delete('all')
+    global cpfile
+    cpfile = []
     canvas2.create_rectangle(200,50,700,550,fill='white',outline="black", width = 2)
     draw_grid(mingrid)
     canvas2.create_text(770,120,text=" Grid size: "+str(mingrid))
+    canvas2.create_text(780,105,text=" Relative efficiency: "+str(round(((1/mingrid)/scale)*100)/100))
     draw_flaps()
-    pythas()
+    pythas(False)
 
 def lowergrid():
     global mingrid
     mingrid = mingrid-1
     canvas2.delete('all')
+    global cpfile
+    cpfile = []
     canvas2.create_rectangle(200,50,700,550,fill='white',outline="black", width = 2)
     draw_grid(mingrid)
     canvas2.create_text(770,120,text=" Grid size: "+str(mingrid))
+    canvas2.create_text(780,105,text=" Relative efficiency: "+str(round(((1/mingrid)/scale)*100)/100))
     draw_flaps()
-    pythas()
-        
-#=======
+    pythas(False)
+#======================================
+def refresh():
+    canvas2.delete('all')
+    global cpfile
+    cpfile = []
+    canvas2.create_rectangle(200,50,700,550,fill='white',outline="black", width = 2)
+    draw_grid(mingrid)
+    canvas2.create_text(770,120,text=" Grid size: "+str(mingrid))
+    canvas2.create_text(780,105,text=" Relative efficiency: "+str(round(((1/mingrid)/scale)*100)/100))
+    approximate_positions(mingrid)
+    draw()
+    if find_pythas():
+        raise
+    display_pythas()
+    drawxs()
+
+clickcount = 0
+
+def key(event):
+    #print ("pressed", repr(event.char))
+    pass
+cursor = canvas2.create_line(0,0,0,0) #buffer, to be deleted soon 
+def selectnode(event):
+    #frame.focus_set()
+    global cursor, vertexx, vertexy, selectednode
+    vertexx = event.x
+    vertexy = event.y
+    canvas2.delete(cursor)
+    selectednode = None
+    for n in range(0,len(approx_nodes)):
+        if abs(vertexx-pyx(approx_nodes[n].x))<5 and abs(vertexy-pyy(approx_nodes[n].y))<5:            
+            selectednode = nodes[n]
+            selectednode.flaplength = float(selectednode.flaplength)
+            cursor = canvas2.create_oval(pyx(selectednode.x-selectednode.flaplength/mingrid), pyy(selectednode.y-selectednode.flaplength/mingrid),pyx(selectednode.x+selectednode.flaplength/mingrid), pyy(selectednode.y+selectednode.flaplength/mingrid),width = 3,outline="black")
+            '''
+        if abs(vertexx-pyx(approx_nodes[n].x))<5 and abs(vertexy-pyy(approx_nodes[n].y))<5 and nodes[n] == selectednode:
+            canvas2.delete(cursor) #will deselect if you double click on the selected node 
+            selectednode = None'''
+                
+def growflap():
+    global cursor
+    selectednode.flaplength = selectednode.flaplength +1
+    for p in range(0,len(paths)):
+        if paths[p].index in selectednode.paths:
+            paths[p].tmlength +=1
+    refresh()
+    cursor = canvas2.create_oval(pyx(selectednode.x-selectednode.flaplength/mingrid), pyy(selectednode.y-selectednode.flaplength/mingrid),pyx(selectednode.x+selectednode.flaplength/mingrid), pyy(selectednode.y+selectednode.flaplength/mingrid),width = 3,outline="black")
+
+def shrinkflap():
+    global cursor
+    selectednode.flaplength = selectednode.flaplength -1
+    for p in range(0,len(paths)):
+        if paths[p].index in selectednode.paths:
+            paths[p].tmlength -=1
+    refresh()
+    cursor = canvas2.create_oval(pyx(selectednode.x-selectednode.flaplength/mingrid), pyy(selectednode.y-selectednode.flaplength/mingrid),pyx(selectednode.x+selectednode.flaplength/mingrid), pyy(selectednode.y+selectednode.flaplength/mingrid),width = 3,outline="black")
+     
+'''    recent = canvas2.create_line(vertexx,vertexy,event.x,event.y,fill="red",width=2)
+    lines.append(recent)
+
+'''
+def click(event):
+    selectnode(event)
+    '''global clickcount
+    start = True
+    #clickcount =+ 1
+    if clickcount//2 != clickcount/2:
+        lineend(event)
+        clickcount+=1
+        start = False
+    if clickcount//2 == clickcount/2 and start:
+        selectnode(event)
+        clickcount+=1'''
+
+canvas2.bind("<Key>", key)
+canvas2.bind("<Button-1>", click)
+
+enter = Button(canvas2,text="Grow selected flap",command=growflap)
+enter.place(x=720,y=300)
+enter = Button(canvas2,text="Shrink selected flap",command=shrinkflap)
+enter.place(x=720,y=330)
+#======================================
     
 class Path():
     def __init__(self,index, tmlength,node1, node2): #tmlength is in tree units, and is the minimum length
@@ -253,18 +359,23 @@ def find_paths():
             pathlength = int(tmfile[scanner+15])#the number of nodes on the path. if this number is 3 (the minimum) the next 3 numbers will the the nodes. take the first and last.
             paths.append(Path(tmfile[scanner+1],tmfile[scanner+2],tmfile[scanner+16],tmfile[scanner+15+pathlength]))
             
-def pythas():
+def pythas(exception):
     find_paths()
-    find_pythas()
-    #display_pythas()
+    if find_pythas() and not exception: #don't raise if it's on the first go
+        raise
+    display_pythas()
+    drawxs()
 
-def find_pythas():
+def find_pythas(): #will test if there are any that overlap
+    faulty = False
     for x in range(0,len(paths)):
         paths[x].find_coordinates()
         if paths[x].is_too_tight():
-            canvas2.create_line(pyx2(paths[x].x1),pyy(paths[x].y1),pyx2(paths[x].x2),pyy(paths[x].y2),fill='red', width = 3)
-        if paths[x].needs_pytha():
-            canvas2.create_line(pyx2(paths[x].x1),pyy(paths[x].y1),pyx2(paths[x].x2),pyy(paths[x].y2),fill='orange', width = 3)
+            canvas2.create_line(pyx2(paths[x].x1),pyy(paths[x].y1),pyx2(paths[x].x2),pyy(paths[x].y2),fill='pink', width = 2)
+            faulty = True
+        #if paths[x].needs_pytha():
+            #canvas2.create_line(pyx2(paths[x].x1),pyy(paths[x].y1),pyx2(paths[x].x2),pyy(paths[x].y2),fill='orange', width = 2)
+    return faulty
 
 def display_pythas():
     for p in range(0,len(paths)):
@@ -273,24 +384,37 @@ def display_pythas():
         
 
 def calculate_pytha(path):
-    global x,y,flap1,flap2 #it should be fine bc the pythas calculate one at a time
+    '''for n in range(0,len(nodes)):
+        nodes[n].has_pytha_ur = nodes[n].has_pytha_ul = nodes[n].has_pytha_dl = nodes[n].has_pytha_dr = False #ul = upper left, dr = down right, etc'''
+    global x,y,flap1,flap2, flipper #it should be fine bc the pythas calculate one at a time
     x = abs(path.x1-path.x2)*mingrid
     y = abs(path.y1-path.y2)*mingrid #because the pytha program runs it in terms of grid units
     if (path.y2-path.y1)/(path.x2-path.x1) < 0:
-        needs_to_flip = False
+        flipper = 1 #multiplying by 1 will not flip it
     else:
-        needs_to_flip = True  #because we took the abs of the coordinates, we don't know the orientation the pytha needs to be. we'll store this for later
+        flipper = -1  #because we took the abs of the coordinates, we don't know the orientation the pytha needs to be. we'll store this for later
     for n in range(0,len(nodes)):  #go get a flap length
         if nodes[n].index == path.node1:
             flap1 = float(nodes[n].flaplength)
+            bruh1 = n #we're gonna cop this for later, need to mark these nodes
+        if nodes[n].index == path.node2:
+            bruh2 = n
+            #maybe cop the flap length here too, for when we get rivers and pythas that aren't as tight as they could be    
     flap2 = path.tmlength - flap1
-    #print(x,y,flapx,flapy)
+    global tkx,tky
+    tkx = lambda coordinate: pyx(flipper*coordinate/mingrid+path.x2) #this will move the pytha into place
+    tky = lambda coordinate: pyy(coordinate/mingrid+path.y1)
     show_solution1()
+
+    if nodes[bruh1].x > nodes[bruh2].x and nodes[bruh1].y > nodes[bruh2].y: 
+        nodes[bruh1].has_pytha_dl = nodes[bruh2].has_pytha_ur = True
+    if nodes[bruh1].x < nodes[bruh2].x and nodes[bruh1].y < nodes[bruh2].y:
+        nodes[bruh1].has_pytha_ur = nodes[bruh2].has_pytha_dl = True
+    if nodes[bruh1].x > nodes[bruh2].x and nodes[bruh1].y < nodes[bruh2].y:
+        nodes[bruh1].has_pytha_ul = nodes[bruh2].has_pytha_dr = True        
+    if nodes[bruh1].x < nodes[bruh2].x and nodes[bruh1].y > nodes[bruh2].y:
+        nodes[bruh1].has_pytha_dr = nodes[bruh2].has_pytha_ul = True
 #============================================== start pytha calculation section
-def tkx(coordinate):
-    return pyx(coordinate)
-def tky(coordinate):
-    return pyy(coordinate)
 
 
 #nicecombos = []
@@ -337,7 +461,7 @@ def rotate():
     global a2x,a2y
     a2x=bx+ay-by
     a2y=by+ax-bx
-    canvas2.create_rectangle(tkx(bx),tky(by),tkx(a2x),tky(a2y),outline="purple",width=2)
+    #canvas2.create_rectangle(tkx(bx),tky(by),tkx(a2x),tky(a2y),outline="purple",width=2)
 
 def cd1():
     global cx,cy,dx,dy,a2x,a2y
@@ -345,6 +469,7 @@ def cd1():
     cy= by-factor1
     dx = bx-factor2
     dy = a2y + factor2
+    
     if dy>y:
         gap = dy-y
         dy -= gap
@@ -363,6 +488,7 @@ def cd1():
         a2y+= gap
         a2x-= gap
         #print('SHIFTED UP')
+    '''
     while a2y >=dy:
         a2y -=1
         a2x +=1
@@ -376,7 +502,8 @@ def cd1():
         else:
             del(combos[solution])
         solution = 0
-        next_solution()
+        next_solution()'''
+        
         
     
 
@@ -391,9 +518,9 @@ def parallelogram():
 
 
 def arms():
-    canvas2.create_line(tkx(bx),tky(by),tkx(bx-5),tky(by-5),fill="red",width=2)
+    #canvas2.create_line(tkx(bx),tky(by),tkx(bx-5),tky(by-5),fill="red",width=2)
     canvas2.create_line(tkx(ax),tky(ay),tkx(a2x),tky(a2y),fill="red",width=2)
-    canvas2.create_line(tkx(ax),tky(ay),tkx(ax+5),tky(ay+5),fill="red",width=2)  
+    #canvas2.create_line(tkx(ax),tky(ay),tkx(ax+5),tky(ay+5),fill="red",width=2)  
 def b():
     canvas2.create_line(tkx(b2x),tky(b2y),tkx(bx),tky(by),fill="red",width=2)
 def ridge():
@@ -435,13 +562,13 @@ def next_solution():
             solution =0
             factor1 = combos[solution][1]
             factor2 = area/factor1
-    canvas2.delete("all")
+    #canvas2.delete("all")
     canvas2.create_rectangle(0,00,600,600,fill="white",outline="white")
 
-    draw_grid(x,y,grid)
-    draw_circles(x,y,grid,flap1,flap2)
-    draw_boxes(x,y,grid,flap1,flap2)
-    draw_axis(x,y,grid)
+    #draw_grid(x,y,grid)
+    #draw_circles(x,y,grid,flap1,flap2)
+    #draw_boxes(x,y,grid,flap1,flap2)
+    #draw_axis(x,y,grid)
 
     rotate()
     cd1()
@@ -460,12 +587,12 @@ enter = Button(canvas2,text="Approximate to bp",command=bpify)
 enter.place(x=720,y=70)
 enter = Button(canvas2,text="Increase grid size",command=bumpgrid)
 enter.place(x=720,y=130)
-enter = Button(canvas2,text="Reduce grid size",command=lowergrid)
+enter = Button(canvas2,text="Decrease grid size",command=lowergrid)
 enter.place(x=720,y=160)   #maybe an entry box for the grid size?
 
 
 enter = Button(canvas2,text="Draw ridges",command=drawxs)
-enter.place(x=720,y=300)
+#enter.place(x=720,y=300)
 
 
 #for debugging purposes
