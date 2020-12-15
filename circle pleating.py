@@ -35,7 +35,7 @@ def findvertices():
     global vertices
     for x in range(0,len(tmfile)):
         if tmfile[x] == 'vrtx':
-            vertices.append((tmfile[x+2],tmfile[x+3]))        
+            vertices.append([tmfile[x+2],tmfile[x+3]])        
 def findcreases():
     findvertices()
     global creases
@@ -46,12 +46,12 @@ def findcreases():
                 mv = 3
             elif mv ==3: #edges, like when you cut off the corner
                 mv = 1  
-            creases.append((vertices[int(tmfile[x+4])],vertices[int(tmfile[x+5])],mv))
+            creases.append([vertices[int(tmfile[x+4])],vertices[int(tmfile[x+5])],mv])
             #also need to extract the m/v, or at least axial vs hinge vs ridge
 def cp(tm): #converts tm coordinates to .cp coordinates
     return (float(tm)*400)-200
-def pyx(tm): #converts tm coordinates to the python coordinates. for now, it is a 300x300 pixel square. this works only for the left
-    return (float(tm)*500)+200 #works for both left and right squares
+def pyx(tm): #converts tm coordinates into python (tk) coordinates
+    return (float(tm)*500)+200 
 def pyy(tm):
     return 550-(float(tm)*500)
 def displaycp():
@@ -74,6 +74,13 @@ def makecp():
     global cpfile
     cpfile = ["1 -200 -200 -200 200", "1 -200 200 200 200", "1 200 200 200 -200", "1 200 -200 -200 -200"]
     findcreases()
+    no_mv = True #by default we're just gonna make everything m
+    for x in range(1,len(creases)):
+        if creases[x][2] ==2:
+            no_mv = False
+    if no_mv:
+        for x in range(1,len(creases)):
+            creases[x][2] = 2
     for x in range(1, len(creases)):
         cpfile.append(str(creases[x][2])+" "+str(cp(creases[x][0][0]))+" "+str(cp(creases[x][0][1]))+" "+str(cp(creases[x][1][0]))+" "+str(cp(creases[x][1][1])))
 def file_save():
@@ -105,7 +112,7 @@ enter.place(x=20,y=450)
 def bpify():  #make this one do all the initial things that shouldn't be done again
     global nodes,edges, scale,mingrid, cpfile
     canvas2.delete('all')
-    cpfile = []
+    cpfile = ["1 -200 -200 -200 200", "1 -200 200 200 200", "1 200 200 200 -200", "1 200 -200 -200 -200"]
     #displaycp()
     canvas2.create_rectangle(200,50,700,550,fill='white',outline="black", width = 2)
     scale = float(tmfile[4])
@@ -116,10 +123,11 @@ def bpify():  #make this one do all the initial things that shouldn't be done ag
     canvas2.create_text(780,105,text=" Relative efficiency: "+str(round(((1/mingrid)/scale)*100)/100))
     draw_flaps()
     pythas(True)
-    for p in range(0,len(paths)):
+    '''for p in range(0,len(paths)):
         if paths[p].is_too_tight():
             initialbumpgrid()
-            pass
+            pass'''
+    refresh() #idk why but this is needed
 #=======
 def pyx2(tm):
         return pyx(tm) #originally there were two squares, but here i combine them
@@ -136,6 +144,8 @@ def draw_flaps(): #only used for the first time, the initial extraction and what
     assign_flap_lengths() #connect the edges and nodes
     approximate_positions(mingrid)
     draw()
+    drawhinges()
+
 class Leaf_node():
     def __init__(self,index,x,y,flaplength):
         self.index = index
@@ -147,16 +157,53 @@ class Leaf_node():
     def drawx(self):
         if not self.has_pytha_dl:
             canvas2.create_line(pyx(self.x),pyy(self.y),pyx(self.x-min(self.x,self.y,float(self.flaplength)/mingrid)),pyy(self.y-min(self.x,self.y,float(self.flaplength)/mingrid)),fill='red',width = 2)  #down and left
+            cpfile.append("2 "+str(cp(self.x))+" "+str(cp(self.y))+" "+str(cp(self.x-min(self.x,self.y,float(self.flaplength)/mingrid)))+" "+str(cp(self.y-min(self.x,self.y,float(self.flaplength)/mingrid))))
         if not self.has_pytha_dr:
             canvas2.create_line(pyx(self.x),pyy(self.y),pyx(self.x+min(1-self.x,self.y,float(self.flaplength)/mingrid)),pyy(self.y-min(1-(self.x),self.y,float(self.flaplength)/mingrid)),fill='red', width = 2)  #down and right
+            cpfile.append("2 "+str(cp(self.x))+" "+str(cp(self.y))+" "+str(cp(self.x+min(1-self.x,self.y,float(self.flaplength)/mingrid)))+" "+str(cp(self.y-min(1-self.x,self.y,float(self.flaplength)/mingrid))))
         if not self.has_pytha_ur:
             canvas2.create_line(pyx(self.x),pyy(self.y),pyx(self.x+min(1-self.x,1-self.y,float(self.flaplength)/mingrid)),pyy(self.y+min(1-(self.x),1-self.y,float(self.flaplength)/mingrid)),fill='red', width = 2)  #up and right
+            cpfile.append("2 "+str(cp(self.x))+" "+str(cp(self.y))+" "+str(cp(self.x+min(1-self.x,1-self.y,float(self.flaplength)/mingrid)))+" "+str(cp(self.y+min(1-self.x,1-self.y,float(self.flaplength)/mingrid))))
         if not self.has_pytha_ul:
             canvas2.create_line(pyx(self.x),pyy(self.y),pyx(self.x-min(self.x,1-self.y,float(self.flaplength)/mingrid)),pyy(self.y+min(self.x,1-self.y,float(self.flaplength)/mingrid)),fill='red', width = 2)  #up and left
+            cpfile.append("2 "+str(cp(self.x))+" "+str(cp(self.y))+" "+str(cp(self.x-min(self.x,1-self.y,float(self.flaplength)/mingrid)))+" "+str(cp(self.y+min(self.x,1-self.y,float(self.flaplength)/mingrid))))
+    def drawhinge(self):
+        self.flaplength = float(self.flaplength)
+        if not self.has_pytha_ur:
+            canvas2.create_line(pyx(self.x),pyy(min(1,self.y+self.flaplength/mingrid)),pyx(min(1,self.x+self.flaplength/mingrid)),pyy(min(1,self.y+self.flaplength/mingrid)),fill='blue',width=2)
+            canvas2.create_line(pyx(min(self.x+self.flaplength/mingrid,1)),pyy(self.y),pyx(min(self.x+self.flaplength/mingrid,1)),pyy(min(1,self.y+self.flaplength/mingrid)),fill='blue',width=2)
+            cpfile.append("3 "+str(cp(self.x))+' '+str(cp(min(1,self.y+self.flaplength/mingrid)))+' '+str(cp(min(1,self.x+self.flaplength/mingrid)))+' '+str(cp(min(1,self.y+self.flaplength/mingrid))))
+            cpfile.append("3 "+str(cp(min(self.x+self.flaplength/mingrid,1)))+' '+str(cp(self.y))+' '+str(cp(min(self.x+self.flaplength/mingrid,1)))+' '+str(cp(min(1,self.y+self.flaplength/mingrid))))
+
+        if not self.has_pytha_ul:
+            canvas2.create_line(pyx(self.x),pyy(min(1,self.y+self.flaplength/mingrid)),pyx(max(0,self.x-self.flaplength/mingrid)),pyy(min(1,self.y+self.flaplength/mingrid)),fill='blue',width=2)
+            canvas2.create_line(pyx(max(0,self.x-self.flaplength/mingrid)),pyy(self.y),pyx(max(0,self.x-self.flaplength/mingrid)),pyy(min(1,self.y+self.flaplength/mingrid)),fill='blue',width=2)
+            cpfile.append("3 "+str(cp(self.x))+' '+str(cp(min(1,self.y+self.flaplength/mingrid)))+' '+str(cp(max(0,self.x-self.flaplength/mingrid)))+' '+str(cp(min(1,self.y+self.flaplength/mingrid))))
+            cpfile.append("3 "+str(cp(max(0,self.x-self.flaplength/mingrid)))+' '+str(cp(self.y))+' '+str(cp(max(0,self.x-self.flaplength/mingrid)))+' '+str(cp(min(1,self.y+self.flaplength/mingrid))))
+
+        if not self.has_pytha_dr:
+            canvas2.create_line(pyx(self.x),pyy(max(0,self.y-self.flaplength/mingrid)),pyx(min(1,self.x+self.flaplength/mingrid)),pyy(max(0,self.y-self.flaplength/mingrid)),fill='blue',width=2)
+            canvas2.create_line(pyx(min(1,self.x+self.flaplength/mingrid)),pyy(self.y),pyx(min(1,self.x+self.flaplength/mingrid)),pyy(max(0,self.y-self.flaplength/mingrid)),fill='blue',width=2)
+            cpfile.append("3 "+str(cp(self.x))+' '+str(cp(max(0,self.y-self.flaplength/mingrid)))+' '+str(cp(min(1,self.x+self.flaplength/mingrid)))+' '+str(cp(max(0,self.y-self.flaplength/mingrid))))
+            cpfile.append("3 "+str(cp(min(self.x+self.flaplength/mingrid,1)))+' '+str(cp(self.y))+' '+str(cp(min(self.x+self.flaplength/mingrid,1)))+' '+str(cp(max(0,self.y-self.flaplength/mingrid))))
+
+        if not self.has_pytha_dl:
+            canvas2.create_line(pyx(self.x),pyy(max(0,self.y-self.flaplength/mingrid)),pyx(max(0,self.x-self.flaplength/mingrid)),pyy(max(0,self.y-self.flaplength/mingrid)),fill='blue',width=2)
+            canvas2.create_line(pyx(max(0,self.x-self.flaplength/mingrid)),pyy(self.y),pyx(max(0,self.x-self.flaplength/mingrid)),pyy(max(0,self.y-self.flaplength/mingrid)),fill='blue',width=2)
+            cpfile.append("3 "+str(cp(self.x))+' '+str(cp(max(0,self.y-self.flaplength/mingrid)))+' '+str(cp(max(0,self.x-self.flaplength/mingrid)))+' '+str(cp(max(0,self.y-self.flaplength/mingrid))))
+            cpfile.append("3 "+str(cp(max(0,self.x-self.flaplength/mingrid)))+' '+str(cp(self.y))+' '+str(cp(max(0,self.x-self.flaplength/mingrid)))+' '+str(cp(max(0,self.y-self.flaplength/mingrid))))
 
 def drawxs():
     for n in range(0,len(nodes)):
         nodes[n].drawx()
+def drawhinges():
+    for n in range(0,len(nodes)):
+        nodes[n].drawhinge()
+'''        if not nodes[n].has_pytha_:dl
+        
+        if not nodes[n].has_pytha_:dr'''
+
+
 def find_nodes():
     global nodes
     nodes = []
@@ -192,11 +239,11 @@ def draw():
         canvas2.create_oval(pyx2(float(approx_nodes[n].x)-(1/mingrid)*float(approx_nodes[n].flaplength)),pyy(float(approx_nodes[n].y)-(1/mingrid)*float(approx_nodes[n].flaplength)),pyx2(float(approx_nodes[n].x)+(1/mingrid)*float(approx_nodes[n].flaplength)),pyy(float(approx_nodes[n].y)+(1/mingrid)*float(approx_nodes[n].flaplength)),outline='gray')
 
 def initialbumpgrid(): #nvm this, it's kinda complicated
-    global mingrid, cpfile
+    global mingrid, cpfile,selectednode
     mingrid = mingrid+1
     canvas2.delete('all')
     global cpfile
-    cpfile = []
+    cpfile = ["1 -200 -200 -200 200", "1 -200 200 200 200", "1 200 200 200 -200", "1 200 -200 -200 -200"]
     canvas2.create_rectangle(200,50,700,550,fill='white',outline="black", width = 2)
     draw_grid(mingrid)
     canvas2.create_text(770,120,text=" Grid size: "+str(mingrid))
@@ -207,49 +254,65 @@ def initialbumpgrid(): #nvm this, it's kinda complicated
 def bumpgrid():
     global mingrid
     mingrid = mingrid+1
-    canvas2.delete('all')
-    global cpfile
-    cpfile = []
-    canvas2.create_rectangle(200,50,700,550,fill='white',outline="black", width = 2)
-    draw_grid(mingrid)
-    canvas2.create_text(770,120,text=" Grid size: "+str(mingrid))
-    canvas2.create_text(780,105,text=" Relative efficiency: "+str(round(((1/mingrid)/scale)*100)/100))
-    draw_flaps()
-    pythas(False)
+    refresh()
+    canvas2.delete(cursor)
 
 def lowergrid():
-    global mingrid
+    global mingrid, selectednode
     mingrid = mingrid-1
-    canvas2.delete('all')
-    global cpfile
-    cpfile = []
-    canvas2.create_rectangle(200,50,700,550,fill='white',outline="black", width = 2)
-    draw_grid(mingrid)
-    canvas2.create_text(770,120,text=" Grid size: "+str(mingrid))
-    canvas2.create_text(780,105,text=" Relative efficiency: "+str(round(((1/mingrid)/scale)*100)/100))
-    draw_flaps()
-    pythas(False)
+    refresh()
+    canvas2.delete(cursor)
 #======================================
 def refresh():
     canvas2.delete('all')
     global cpfile
-    cpfile = []
-    canvas2.create_rectangle(200,50,700,550,fill='white',outline="black", width = 2)
+    cpfile = ["1 -200 -200 -200 200", "1 -200 200 200 200", "1 200 200 200 -200", "1 200 -200 -200 -200"]
     draw_grid(mingrid)
+    #cursor = canvas2.create_oval(pyx(selectednode.x-selectednode.flaplength/mingrid), pyy(selectednode.y-selectednode.flaplength/mingrid),pyx(selectednode.x+selectednode.flaplength/mingrid), pyy(selectednode.y+selectednode.flaplength/mingrid),width = 3,outline="black")
     canvas2.create_text(770,120,text=" Grid size: "+str(mingrid))
     canvas2.create_text(780,105,text=" Relative efficiency: "+str(round(((1/mingrid)/scale)*100)/100))
     approximate_positions(mingrid)
     draw()
-    if find_pythas():
-        raise
+    for n in range(0,len(nodes)):
+        nodes[n].has_pytha_ur = nodes[n].has_pytha_ul = nodes[n].has_pytha_dl = nodes[n].has_pytha_dr = False #ul = upper left, dr = down right, etc
+    find_pythas()
     display_pythas()
     drawxs()
+    drawhinges()
+    if selectednode != None:
+        cursor = canvas2.create_oval(pyx(selectednode.x-selectednode.flaplength/mingrid), pyy(selectednode.y-selectednode.flaplength/mingrid),pyx(selectednode.x+selectednode.flaplength/mingrid), pyy(selectednode.y+selectednode.flaplength/mingrid),width = 3,outline="black")
+    canvas2.create_rectangle(200,50,700,550,outline="black", width = 2)
+    cpfile.append("1 -200 -200 -200 200")
+    cpfile.append("1 -200 200 200 200")
+    cpfile.append("1 200 200 200 -200")
+    cpfile.append("1 200 -200 -200 -200")
 
-clickcount = 0
 
+def reset():
+    global mingrid, selectednode
+    canvas2.delete('all')
+    global cpfile
+    cpfile = ["1 -200 -200 -200 200", "1 -200 200 200 200", "1 200 200 200 -200", "1 200 -200 -200 -200"]
+    canvas2.create_rectangle(200,50,700,550,fill='white',outline="black", width = 2)
+    draw_grid(mingrid)
+    canvas2.create_text(770,120,text=" Grid size: "+str(mingrid))
+    canvas2.create_text(780,105,text=" Relative efficiency: "+str(round(((1/mingrid)/scale)*100)/100))
+    selectednode = None
+    draw_flaps()
+    pythas(False) 
+    
 def key(event):
     #print ("pressed", repr(event.char))
     pass
+selectednode = None
+def moveflap(event):
+    global selectednode
+    if selectednode != None and (abs(event.x-selectednode.x)>30 or abs(event.y-selectednode.y)>30) and event.x<710 and event.x>190 and event.y<560 and event.y>40:
+        selectednode.x = tmx(event.x)
+        selectednode.y = tmy(event.y)
+        refresh()
+        #selectednode = None
+            
 cursor = canvas2.create_line(0,0,0,0) #buffer, to be deleted soon 
 def selectnode(event):
     #frame.focus_set()
@@ -257,9 +320,8 @@ def selectnode(event):
     vertexx = event.x
     vertexy = event.y
     canvas2.delete(cursor)
-    selectednode = None
-    for n in range(0,len(approx_nodes)):
-        if abs(vertexx-pyx(approx_nodes[n].x))<5 and abs(vertexy-pyy(approx_nodes[n].y))<5:            
+    for n in range(0,len(nodes)):
+        if abs(vertexx-pyx(approx_nodes[n].x))<20 and abs(vertexy-pyy(approx_nodes[n].y))<20:            
             selectednode = nodes[n]
             selectednode.flaplength = float(selectednode.flaplength)
             cursor = canvas2.create_oval(pyx(selectednode.x-selectednode.flaplength/mingrid), pyy(selectednode.y-selectednode.flaplength/mingrid),pyx(selectednode.x+selectednode.flaplength/mingrid), pyy(selectednode.y+selectednode.flaplength/mingrid),width = 3,outline="black")
@@ -285,24 +347,18 @@ def shrinkflap():
             paths[p].tmlength -=1
     refresh()
     cursor = canvas2.create_oval(pyx(selectednode.x-selectednode.flaplength/mingrid), pyy(selectednode.y-selectednode.flaplength/mingrid),pyx(selectednode.x+selectednode.flaplength/mingrid), pyy(selectednode.y+selectednode.flaplength/mingrid),width = 3,outline="black")
-     
+
 '''    recent = canvas2.create_line(vertexx,vertexy,event.x,event.y,fill="red",width=2)
     lines.append(recent)
 
 '''
 def click(event):
     selectnode(event)
-    '''global clickcount
-    start = True
-    #clickcount =+ 1
-    if clickcount//2 != clickcount/2:
-        lineend(event)
-        clickcount+=1
-        start = False
-    if clickcount//2 == clickcount/2 and start:
-        selectnode(event)
-        clickcount+=1'''
-
+    moveflap(event)
+    '''if not selectnode(event):
+        #moveflap(event)
+        print('move')'''
+    
 canvas2.bind("<Key>", key)
 canvas2.bind("<Button-1>", click)
 
@@ -311,7 +367,13 @@ enter.place(x=720,y=300)
 enter = Button(canvas2,text="Shrink selected flap",command=shrinkflap)
 enter.place(x=720,y=330)
 #======================================
-    
+
+def gt(a,b):
+    return (a+0.000001>b)
+def ls(a,b):
+    return(a+0.000001<b)
+def eq(a,b):
+    return(abs(a-b)<0.000001)
 class Path():
     def __init__(self,index, tmlength,node1, node2): #tmlength is in tree units, and is the minimum length
         self.index = index
@@ -338,12 +400,12 @@ class Path():
         self.bplength = max(abs(self.x1-self.x2),abs(self.y1-self.y2))
         self.bphypotenuse = ((self.x1-self.x2)**2 + (self.y1-self.y2)**2)**0.5
     def is_too_tight(self):#see if the nodes are too close. draw with red
-        if self.bphypotenuse*mingrid < self.tmlength:
+        if ls(self.bphypotenuse*mingrid,self.tmlength):
             return True
         else:
             return False
     def needs_pytha(self): #see if it needs a pytha
-        if self.bplength*mingrid < self.tmlength and self.bphypotenuse*mingrid>self.tmlength:
+        if ls(self.bplength*mingrid,self.tmlength) and gt(self.bphypotenuse*mingrid,self.tmlength):
             return True
         else:
             return False
@@ -361,8 +423,10 @@ def find_paths():
             
 def pythas(exception):
     find_paths()
-    if find_pythas() and not exception: #don't raise if it's on the first go
-        raise
+    #if find_pythas() and not exception: #don't raise if it's on the first go
+    find_pythas()
+    if selectednode != None:
+        cursor = canvas2.create_oval(pyx(selectednode.x-selectednode.flaplength/mingrid), pyy(selectednode.y-selectednode.flaplength/mingrid),pyx(selectednode.x+selectednode.flaplength/mingrid), pyy(selectednode.y+selectednode.flaplength/mingrid),width = 3,outline="black")
     display_pythas()
     drawxs()
 
@@ -371,7 +435,7 @@ def find_pythas(): #will test if there are any that overlap
     for x in range(0,len(paths)):
         paths[x].find_coordinates()
         if paths[x].is_too_tight():
-            canvas2.create_line(pyx2(paths[x].x1),pyy(paths[x].y1),pyx2(paths[x].x2),pyy(paths[x].y2),fill='pink', width = 2)
+            canvas2.create_line(pyx2(paths[x].x1),pyy(paths[x].y1),pyx2(paths[x].x2),pyy(paths[x].y2),fill='purple', width = 4)
             faulty = True
         #if paths[x].needs_pytha():
             #canvas2.create_line(pyx2(paths[x].x1),pyy(paths[x].y1),pyx2(paths[x].x2),pyy(paths[x].y2),fill='orange', width = 2)
@@ -386,7 +450,7 @@ def display_pythas():
 def calculate_pytha(path):
     '''for n in range(0,len(nodes)):
         nodes[n].has_pytha_ur = nodes[n].has_pytha_ul = nodes[n].has_pytha_dl = nodes[n].has_pytha_dr = False #ul = upper left, dr = down right, etc'''
-    global x,y,flap1,flap2, flipper #it should be fine bc the pythas calculate one at a time
+    global x,y,flap1,flap2, flipper, bruh2 #it should be fine bc the pythas calculate one at a time
     x = abs(path.x1-path.x2)*mingrid
     y = abs(path.y1-path.y2)*mingrid #because the pytha program runs it in terms of grid units
     if (path.y2-path.y1)/(path.x2-path.x1) < 0:
@@ -402,10 +466,9 @@ def calculate_pytha(path):
             #maybe cop the flap length here too, for when we get rivers and pythas that aren't as tight as they could be    
     flap2 = path.tmlength - flap1
     global tkx,tky
-    tkx = lambda coordinate: pyx(flipper*coordinate/mingrid+path.x2) #this will move the pytha into place
-    tky = lambda coordinate: pyy(coordinate/mingrid+path.y1)
+    tkx = lambda coordinate: pyx(flipper*coordinate/mingrid+flipper*min(flipper*path.x2,flipper*path.x1)) #this will move the pytha into place, need to use the min
+    tky = lambda coordinate: pyy(coordinate/mingrid+min(path.y1,path.y2))
     show_solution1()
-
     if nodes[bruh1].x > nodes[bruh2].x and nodes[bruh1].y > nodes[bruh2].y: 
         nodes[bruh1].has_pytha_dl = nodes[bruh2].has_pytha_ur = True
     if nodes[bruh1].x < nodes[bruh2].x and nodes[bruh1].y < nodes[bruh2].y:
@@ -414,6 +477,8 @@ def calculate_pytha(path):
         nodes[bruh1].has_pytha_ul = nodes[bruh2].has_pytha_dr = True        
     if nodes[bruh1].x < nodes[bruh2].x and nodes[bruh1].y > nodes[bruh2].y:
         nodes[bruh1].has_pytha_dr = nodes[bruh2].has_pytha_ul = True
+
+        
 #============================================== start pytha calculation section
 
 
@@ -504,40 +569,126 @@ def cd1():
         solution = 0
         next_solution()'''
         
-        
+def tmx(py):
+    return (py-200)/500
+def tmy(py):
+    return (550-py)/500
     
+def cptmx(tk): #converts the custom tk into treemaker, then into cp
+    return cp(tmx(tk))
+def cptmy(tk):
+    return cp(tmy(tk))
+
+def pyx(tm): #converts tm coordinates into python (tk) coordinates
+    return (float(tm)*500)+200 
+def pyy(tm):
+    return 550-(float(tm)*500)
 
 def parallelogram():
     canvas2.create_line(tkx(a2x),tky(a2y),tkx(cx),tky(cy),fill="red",width=2)
     canvas2.create_line(tkx(a2x),tky(a2y),tkx(dx),tky(dy),fill="red",width=2)
+    cpfile.append("2 "+str(cptmx(tkx(a2x)))+" "+str(cptmy(tky(a2y)))+" "+str(cptmx(tkx(cx)))+' '+str(cptmy(tky(cy))))
+    cpfile.append("2 "+str(cptmx(tkx(a2x)))+" "+str(cptmy(tky(a2y)))+" "+str(cptmx(tkx(dx)))+' '+str(cptmy(tky(dy))))
+
     global b2x,b2y
     b2x = dx + cx-a2x
     b2y = dy + cy-a2y
     canvas2.create_line(tkx(b2x),tky(b2y),tkx(dx),tky(dy),fill="red",width=2)
     canvas2.create_line(tkx(b2x),tky(b2y),tkx(cx),tky(cy),fill="red",width=2)
+    cpfile.append("2 "+str(cptmx(tkx(b2x)))+" "+str(cptmy(tky(b2y)))+" "+str(cptmx(tkx(cx)))+' '+str(cptmy(tky(cy))))
+    cpfile.append("2 "+str(cptmx(tkx(b2x)))+" "+str(cptmy(tky(b2y)))+" "+str(cptmx(tkx(dx)))+' '+str(cptmy(tky(dy))))
+
 
 
 def arms():
     #canvas2.create_line(tkx(bx),tky(by),tkx(bx-5),tky(by-5),fill="red",width=2)
+    global ay, ax
+    flap2 = float(nodes[bruh2].flaplength)
+    ay +=(ax-flap2)
+    ax = flap2
     canvas2.create_line(tkx(ax),tky(ay),tkx(a2x),tky(a2y),fill="red",width=2)
+    cpfile.append("2 "+str(cptmx(tkx(ax)))+" "+str(cptmy(tky(ay)))+" "+str(cptmx(tkx(a2x)))+' '+str(cptmy(tky(a2y))))
+
     #canvas2.create_line(tkx(ax),tky(ay),tkx(ax+5),tky(ay+5),fill="red",width=2)  
 def b():
     canvas2.create_line(tkx(b2x),tky(b2y),tkx(bx),tky(by),fill="red",width=2)
+    cpfile.append("2 "+str(cptmx(tkx(b2x)))+" "+str(cptmy(tky(b2y)))+" "+str(cptmx(tkx(bx)))+' '+str(cptmy(tky(by))))
+
 def ridge():
     canvas2.create_line(tkx(0),tky(y),tkx(dx),tky(dy),fill="red",width=2)
     canvas2.create_line(tkx(x),tky(0),tkx(cx),tky(cy),fill="red",width=2)
+    cpfile.append("2 "+str(cptmx(tkx(0)))+" "+str(cptmy(tky(y)))+" "+str(cptmx(tkx(dx)))+' '+str(cptmy(tky(dy))))
+    cpfile.append("2 "+str(cptmx(tkx(x)))+" "+str(cptmy(tky(0)))+" "+str(cptmx(tkx(cx)))+' '+str(cptmy(tky(cy))))
 
 
+def hinges():
+    global ey, ex, hx, hy
+    canvas2.create_line(tkx(x),tky(flap1),tkx(ax),tky(ay),fill="blue",width=2)
+    canvas2.create_line(tkx(x-flap1),tky(0),tkx(bx),tky(by),fill="blue",width=2)
+    if ax >= a2x:
+        ey = ay
+        ex = a2x+ ((ay-a2y)/(cy-a2y))*(cx-a2x)
+    if ax <= a2x:
+        ex = ax
+        ey = a2y+ ((a2x-ax)/(a2x-dx))*(dy-a2y)
+        
+    if bx <= b2x:
+        fy = by
+        fx = b2x- ((by-b2y)/(dy-b2y))*(b2x-dx)
+    if bx >= b2x:
+        fx = bx
+        fy = b2y- ((b2x-bx)/(b2x-cx))*(b2y-cy)
+    
+    canvas2.create_line(tkx(ex),tky(ey),tkx(ax),tky(ay),fill="blue",width=2)
+    canvas2.create_line(tkx(fx),tky(fy),tkx(bx),tky(by),fill="blue",width=2)
+    canvas2.create_line(tkx(fx),tky(fy),tkx(ex),tky(ey),fill="blue",width=2)
+
+def hinges2(): #after arms shifts point a
+    global gy, gx, hx, hy
+    flap2 = float(nodes[bruh2].flaplength)
+    canvas2.create_line(tkx(flap2),tky(y),tkx(ax),tky(ay),fill="blue",width=2)
+    #cpfile.append("3 "+str(cptmx(tkx(flap2)))+" "+str(cptmy(y))+" "+str(cptmx(ax))+' '+str(cptmy(ay)))
+
+    if ax >= a2x:
+        gy = ay
+        gx = a2x+ ((ay-a2y)/(cy-a2y))*(cx-a2x)
+    if ax <= a2x:
+        gx = ax
+        gy = a2y+ ((a2x-ax)/(a2x-dx))*(dy-a2y)
+        
+    if bx<=b2x:
+        hy = y-flap2
+        hx = b2x- (((y-b2y)-(y-flap2))/(dy-b2y))*(b2x-dx)
+    if bx>b2x: #if b is in front of b2, find h by using the reflection over the b-b2 line
+        iy = y-flap2
+        ix = bx-( iy-by)
+        hy = by+ (b2y-by)*( (cx-ix)/(cx-b2x))
+        hx = ix
+        canvas2.create_line(tkx(0),tky(y-flap2),tkx(ix),tky(iy),fill = 'blue', width = 2)
+        canvas2.create_line(tkx(ix),tky(iy),tkx(hx),tky(hy),fill='blue', width = 2)
+        #cpfile.append("3 "+str(cptmx(tkx(ix)))+" "+str(cptmy(iy))+" "+str(cptmx(hx))+' '+str(cptmy(hy)))
+        #cpfile.append("3 "+str(cptmx(tkx(ix)))+" "+str(cptmy(iy))+" "+str(cptmx(0))+' '+str(cptmy(y-flap2)))
+
+
+    
+    canvas2.create_line(tkx(gx),tky(gy),tkx(ax),tky(ay),fill="blue",width=2)
+    #canvas2.create_line(tkx(hx),tky(hy),tkx(bx),tky(by),fill="blue",width=2)
+    canvas2.create_line(tkx(hx),tky(hy),tkx(gx),tky(gy),fill="blue",width=2)
+
+    #canvas2.create_line(tkx(0),tky(y-flap2),tkx(bx-((y-flap2)-b2y)),tky(y-flap2),fill="blue",width=2)  
+    canvas2.create_line(tkx(0),tky(y-flap2),tkx(hx),tky(y-flap2),fill="blue",width=2)
+
+    
 def show_solution1():
     overlap()
     rotate()
     cd1()
     parallelogram()
     b()
-    arms()
     ridge()
-
-
+    hinges()
+    arms()
+    hinges2()
 def next_solution():
     global solution,factor1,factor2
     if nicecombos!=[]:
@@ -574,7 +725,9 @@ def next_solution():
     cd1()
     parallelogram()
     b()
+    hinges()
     arms()
+    hinges2()
     ridge()
 #======================================================= end pytha section
 
@@ -589,7 +742,8 @@ enter = Button(canvas2,text="Increase grid size",command=bumpgrid)
 enter.place(x=720,y=130)
 enter = Button(canvas2,text="Decrease grid size",command=lowergrid)
 enter.place(x=720,y=160)   #maybe an entry box for the grid size?
-
+enter = Button(canvas2,text="Reset layout",command=reset)
+enter.place(x=720,y=220)
 
 enter = Button(canvas2,text="Draw ridges",command=drawxs)
 #enter.place(x=720,y=300)
@@ -614,4 +768,4 @@ def print_path(index):
             print('needs pytha', paths[p].needs_pytha())
 
 
-
+'''you can test for rivers by checking what edges are on the paths. can also just take path length and subtract the flaps'''
